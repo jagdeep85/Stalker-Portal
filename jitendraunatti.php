@@ -672,7 +672,8 @@ function jitendraunatti($THANOS, $ROLEX, $NICK_FURY, $KANG, $PETER_PARKER, $CHAV
     $ROCKET_RACCOON = date('l jS \of F Y h:i:s A');
     $IRON_MAN = curl_init($THANOS);
     curl_setopt($IRON_MAN, CURLOPT_HTTPHEADER, $ROLEX);
-    curl_setopt($IRON_MAN, CURLOPT_TIMEOUT, 10);
+    curl_setopt($IRON_MAN, CURLOPT_CONNECTTIMEOUT, 10);
+    curl_setopt($IRON_MAN, CURLOPT_TIMEOUT, 30);
     curl_setopt($IRON_MAN, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($IRON_MAN, CURLOPT_ENCODING, "gzip");
     if ($NICK_FURY == "POST") {

@@ -90,9 +90,51 @@ if (@$_REQUEST['id']) {
         exit(trim(str_replace(["#EXTM3U"], ["#EXTM3U\n#DEVELOPED_BY_{$SCARLET_WITCH['JITENDRA_UNIVERSE']["x-developed-by"]}\n#AUTHOR-{$SCARLET_WITCH['JITENDRA_UNIVERSE']["token"]}"], $CASSIE)));
     }
 } elseif (!empty($_REQUEST['cassie']) && $_REQUEST['token'] == base64_decode(hex2bin("536b6c5552553545556b46665331564e5156493d"))) {
+    // Stream the segment straight through instead of buffering it, so large VOD
+    // segments are not cut off by a fixed timeout (which made players restart).
+    @set_time_limit(0);
+    @ini_set('zlib.output_compression', '0');
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    $HEADERS = $ROLEX;
+    if (!empty($_SERVER['HTTP_RANGE'])) {
+        $HEADERS[] = 'Range: ' . $_SERVER['HTTP_RANGE'];
+    }
+    $IRON_MAN = curl_init(scarlet_witch("decrypt", $_REQUEST['cassie']));
+    curl_setopt($IRON_MAN, CURLOPT_HTTPHEADER, $HEADERS);
+    curl_setopt($IRON_MAN, CURLOPT_FOLLOWLOCATION, true);
+    curl_setopt($IRON_MAN, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($IRON_MAN, CURLOPT_SSL_VERIFYHOST, 0);
+    curl_setopt($IRON_MAN, CURLOPT_CONNECTTIMEOUT, 10);
+    // No overall timeout; abort only if the upstream stalls (< 1 KB/s for 30s).
+    curl_setopt($IRON_MAN, CURLOPT_TIMEOUT, 0);
+    curl_setopt($IRON_MAN, CURLOPT_LOW_SPEED_LIMIT, 1024);
+    curl_setopt($IRON_MAN, CURLOPT_LOW_SPEED_TIME, 30);
+    $SENT_STATUS = false;
+    curl_setopt($IRON_MAN, CURLOPT_HEADERFUNCTION, function ($ch, $line) use (&$SENT_STATUS) {
+        if (preg_match('#^HTTP/\S+\s+(\d{3})#', $line, $m)) {
+            // A new status line starts each response in a redirect chain.
+            http_response_code((int)$m[1]);
+            header_remove('Content-Length');
+            header_remove('Content-Range');
+            $SENT_STATUS = true;
+        } elseif (preg_match('/^(Content-Type|Content-Length|Content-Range|Accept-Ranges):/i', $line)) {
+            header(trim($line), true);
+        }
+        return strlen($line);
+    });
+    curl_setopt($IRON_MAN, CURLOPT_WRITEFUNCTION, function ($ch, $chunk) {
+        echo $chunk;
+        flush();
+        return connection_aborted() ? 0 : strlen($chunk);
+    });
     header("Content-Type: video/mp2t");
-    $DOCTOR_STRANGE = jitendraunatti(scarlet_witch("decrypt", $_REQUEST['cassie']), $ROLEX, "GET", null, 0, 1, 0, 0, true);
-    echo $DOCTOR_STRANGE["JITENDRAUNATTI"]["data"];
+    curl_exec($IRON_MAN);
+    if (curl_errno($IRON_MAN) && !$SENT_STATUS && !headers_sent()) {
+        http_response_code(502);
+    }
+    @curl_close($IRON_MAN);
 } else {
     header("Location: " . $SCARLET_WITCH['meta_data']["fallback_video"]);
     exit;
